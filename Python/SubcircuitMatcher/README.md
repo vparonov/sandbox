@@ -6,4 +6,4 @@ To run the script you have to install the NetworkX Python Library
 ```
 pip install networkx
 ```
-This code is free for non commercial use.
+This code is free for noncommercial use.
