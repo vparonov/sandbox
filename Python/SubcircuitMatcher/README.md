@@ -1,4 +1,4 @@
-#SubcircuitMatcher
+# SubcircuitMatcher
 
 The basic idea is to transform SPICE netlist into graph, and later to do match different sub circuits (also represented as graphs).
 
