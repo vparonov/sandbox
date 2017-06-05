@@ -63,7 +63,7 @@ function g(a, n, s, r, N) {
 }
 
 var r = [] ;
-var MAXN = 55 ;
+var MAXN = 6 ;
 for (var i = 2 ; i <= MAXN ; i++)
 {
 	g([], 1, 0, r, i) ;
@@ -89,6 +89,10 @@ tr.sort(function(a, b) {
 	return toFp(a.v) - toFp(b.v) ;
 })
 .forEach(function (s) {
-	console.log(toFp(s.v) + "\t" + toString(s.v) +"\t"+s.s + "\t" + s.l) ;
+	//console.log(toFp(s.v) + "\t" + toString(s.v) +"\t"+s.s + "\t" + s.l) ;
+	console.log(toString(s.v)) ;
 });
+
+
+
 

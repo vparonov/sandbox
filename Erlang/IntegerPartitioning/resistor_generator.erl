@@ -1,5 +1,8 @@
+%cd("D:/Projects/public_github_projects/Erlang/IntegerPartitioning").
+%c("resistor_generator.erl").
+%resistore_generator:test_g(3).
 -module(resistor_generator).
--export([test/0,toString/1]).
+-export([test/0,test_g/1,toString/1]).
 
 
 -record(fraction, {nominator, denominator}).
@@ -111,3 +114,53 @@ test() ->
 	test_toFp(),
 	g(0,-1,[],5).
 	
+
+for(I,N,F,R) when I =:= N -> [F(I)|R] ;
+for(I,N,F,R) ->
+	[F(I)|for(I+1,N,F,R)]. 
+
+
+mp(N) ->
+    lists:foreach(fun (X) -> put(X, undefined) end,
+          lists:seq(1, N)), % clean up process dictionary for sure
+    mp(N, N).
+
+mp(N, Max) when N > 0 ->
+    case get(N) of
+      undefined -> R = mp(N, 1, Max, []), put(N, R), R;
+      [[Max | _] | _] = L -> L;
+      [[X | _] | _] = L ->
+          R = mp(N, X + 1, Max, L), put(N, R), R
+    end;
+mp(0, _) -> [[]];
+mp(_, _) -> [].
+
+mp(_, X, Max, R) when X > Max -> R;
+mp(N, X, Max, R) ->
+    mp(N, X + 1, Max, prepend(X, mp(N - X, X), R)).
+
+prepend(_, [], R) -> R;
+prepend(X, [H | T], R) -> prepend(X, T, [[X | H] | R]).
+
+
+toFractions(L) ->
+	lists:map(fun(LI) -> fraction(1, LI) end, L).
+
+tranformF()->
+	% function that transforms
+	% list [a, b, c, d] into tuple {[a, b, c, d], 1/(1/a + 1/b + 1/c + 1/d)}
+	fun(LI) -> 
+		{1.0 / lists:foldl(fun(Item, Agg) -> Agg + toFp(Item) end, 0, toFractions(LI)), LI} 
+	end.
+
+
+generateResistorNetworks(N) ->
+	%generate all partitions from 1 to N
+	L = lists:map(fun(I) -> mp(I) end,lists:seq(1, N)),
+	%transform every parition into a circuit from parallel connected resistors
+	All = lists:flatten(lists:map(fun(LI) -> lists:map(tranformF(), LI) end, L)),
+	Sorted = lists:sort(fun({A,L1}, {B,L2}) -> ((A =:= B andalso length(L1) > length(L2)) orelse A > B) end, All),
+	maps:from_list(Sorted).
+
+test_g(N) ->
+	generateResistorNetworks(N).
