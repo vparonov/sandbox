@@ -1,9 +1,10 @@
+
 %cd("D:/Projects/public_github_projects/Erlang/IntegerPartitioning").
 %c("resistor_generator.erl").
 %resistore_generator:test_g(3).
 -module(resistor_generator).
--export([test/0,test_g/1,toString/1]).
-
+-export([test/0,test_g/1,test_r/1,toString/1]).
+-include_lib("stdlib/include/ms_transform.hrl").
 
 -record(fraction, {nominator, denominator}).
 
@@ -40,23 +41,6 @@ invert(F) ->
 
 toFp(F) ->
 	F#fraction.nominator / F#fraction.denominator.	
-
-%function g(a, n, s, r, N) {
-%	if (s >= N)
-%	{
-%		if (s == N)
-%		{
-%			r.push([].concat(a)) ;
-%		}
-%		return ;
-%	}
-%	for (var i = n ; i <= N ; i++)
-%	{
-%		a.push(i) ;
-%		g(a, i, s+i, r, N) ;
-%		a.pop() ;
-%	}
-%}
 
 g(S,_,A,NN) when S >= NN -> 
 	A;
@@ -115,11 +99,6 @@ test() ->
 	g(0,-1,[],5).
 	
 
-for(I,N,F,R) when I =:= N -> [F(I)|R] ;
-for(I,N,F,R) ->
-	[F(I)|for(I+1,N,F,R)]. 
-
-
 mp(N) ->
     lists:foreach(fun (X) -> put(X, undefined) end,
           lists:seq(1, N)), % clean up process dictionary for sure
@@ -148,19 +127,61 @@ toFractions(L) ->
 
 tranformF()->
 	% function that transforms
-	% list [a, b, c, d] into tuple {[a, b, c, d], 1/(1/a + 1/b + 1/c + 1/d)}
+	% list [a, b, c, d] into tuple {1/(1/a + 1/b + 1/c + 1/d), lenghOfl, [a, b, c, d]}
 	fun(LI) -> 
-		{1.0 / lists:foldl(fun(Item, Agg) -> Agg + toFp(Item) end, 0, toFractions(LI)), LI} 
+		{
+			1.0 / lists:foldl(fun(Item, Agg) -> Agg + toFp(Item) end, 0, toFractions(LI)), 
+			{lchunks(LI), LI}
+		} 
 	end.
 
+lchunks(L) ->
+		lists:foldl(fun(I, Agg) -> Agg + I end, 0, L).
 
 generateResistorNetworks(N) ->
 	%generate all partitions from 1 to N
 	L = lists:map(fun(I) -> mp(I) end,lists:seq(1, N)),
+	
 	%transform every parition into a circuit from parallel connected resistors
 	All = lists:flatten(lists:map(fun(LI) -> lists:map(tranformF(), LI) end, L)),
-	Sorted = lists:sort(fun({A,L1}, {B,L2}) -> ((A =:= B andalso length(L1) > length(L2)) orelse A > B) end, All),
-	maps:from_list(Sorted).
+
+	%sort all circuits by value and number of chunks
+	Sorted = lists:sort(fun({A,{Chunks1, _}}, {B,{Chunks2,_}}) -> ((A > B) orelse (A =:= B andalso Chunks1 > Chunks2)) end, All),
+	maps:to_list(maps:from_list(Sorted)).
+
+saveGeneratedResistorNetworks(FileName, ResistorNetworks) ->
+	{ok,Ref} = dets:open_file(FileName,[]),
+	lists:foreach(fun(Item) -> dets:insert(Ref, Item) end, ResistorNetworks),
+	dets:close(Ref).
+
+openRNF(FileName) ->
+	{ok,Ref} = dets:open_file(FileName,[]),
+	Ref.
+
+closeRNF(Ref) ->
+	dets:close(Ref).
+
 
 test_g(N) ->
-	generateResistorNetworks(N).
+	saveGeneratedResistorNetworks("data.dat", generateResistorNetworks(N)).
+
+test_r(Inputs) ->
+	Table = openRNF("data.dat"),
+	RetVal = lists:map(fun(D) ->
+		Tol = D * 0.10, % search within 10% tolerance 	
+		Selection = 
+			dets:select
+			(
+				Table, 
+				ets:fun2ms(
+						fun({Value, {Chunks, L}}) when abs(Value - D) =< Tol-> {round(1000000 * abs(Value - D)), Value, Chunks, L} end)
+			),
+		SortedSelection = lists:sort(fun({A,_,Ca,_}, {B,_,Cb,_}) -> A < B orelse (A =:= B andalso Ca < Cb) end, Selection),
+		{Top10FromSelection,_} = lists:split(10, SortedSelection), 
+		Top10FromSelection
+	end, Inputs),
+	closeRNF(Table),
+	RetVal.
+
+
+
